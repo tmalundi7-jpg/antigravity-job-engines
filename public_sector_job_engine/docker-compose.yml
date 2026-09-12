@@ -1,0 +1,99 @@
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: job_engine
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d job_engine"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  chromadb:
+    image: chromadb/chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chromadata:/chroma/chroma
+
+  # Agents
+  master_agent:
+    build: .
+    command: python -m agents.master_agent
+    environment:
+      - POSTGRES_URI=postgresql://user:password@postgres:5432/job_engine
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672/
+      - REDIS_URI=redis://redis:6379/0
+      - CHROMADB_HOST=chromadb
+      - CHROMADB_PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  company_list_agent:
+    build: .
+    command: python -m agents.company_list_agent
+    environment:
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  job_search_agent:
+    build: .
+    command: python -m agents.job_search_agent
+    environment:
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  job_parsing_agent:
+    build: .
+    command: python -m agents.job_parsing_agent
+    environment:
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672/
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  matching_agent:
+    build: .
+    command: python -m agents.matching_agent
+    environment:
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672/
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  chromadata:

@@ -1,0 +1,6 @@
+groq
+google-genai
+requests
+beautifulsoup4
+cloudscraper
+python-dotenv

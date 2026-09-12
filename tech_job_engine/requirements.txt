@@ -1,0 +1,12 @@
+pika
+psycopg2-binary
+sqlalchemy
+redis
+chromadb
+google-genai
+playwright
+playwright-stealth
+beautifulsoup4
+pydantic
+tenacity
+python-dotenv
